@@ -59,6 +59,14 @@ await assertCss(page, 'navegação ativa marinho', '.bottom-nav a.active .nav-ic
 await assertCss(page, 'preço marinho', '.market-price strong', 'color', MARINHA);
 
 await page.screenshot({ path: `${SHOTS}/3-home.png` });
+// Visitante vê acesso visível ao login direto na loja
+const pill = page.locator('.login-pill');
+ok('home mostra botão Entrar para visitante', await pill.isVisible() && (await pill.getAttribute('href')) === '/login');
+await pill.click();
+await page.waitForSelector('.auth-page, .form-stack', { timeout: 8000 });
+ok('botão Entrar leva à tela de login', page.url().includes('/login'));
+await page.goBack();
+await page.waitForSelector('.market-home', { timeout: 8000 });
 await page.evaluate(() => window.scrollTo(0, 700));
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${SHOTS}/4-home-trilhos.png` });

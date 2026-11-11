@@ -19,6 +19,7 @@ const email = `teste${Date.now()}@bereree.com`;
 const senha = 'senha-segura-123';
 
 await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+await page.locator('.welcome-copy').waitFor({ state: 'attached', timeout: 15000 });
 await page.locator('.splash').waitFor({ state: 'hidden', timeout: 9000 }).catch(() => {});
 
 // As duas opções existem na tela de boas-vindas
