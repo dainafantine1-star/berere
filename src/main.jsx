@@ -1,0 +1,20 @@
+import React,{Suspense,lazy,useEffect,useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {BrowserRouter,Routes,Route} from 'react-router-dom';
+import '@fontsource/inter/latin-400.css';import '@fontsource/inter/latin-500.css';import '@fontsource/inter/latin-600.css';import '@fontsource/inter/latin-700.css';
+import './style.css';
+import {useShop} from './store';
+import {InstallProvider,InstallPage} from './install';
+import {AgentTools} from './agent-tools';
+import {FeedbackProvider,Shell,Loading,Empty} from './ui';
+import {Splash} from './splash';
+import {HomePage,CategoriesPage,ListingPage,ProductPage,CartPage} from './pages';
+const Extras=lazy(()=>import('./extras'));
+const Checkout=lazy(()=>import('./checkout'));
+const Account=lazy(()=>import('./account'));
+const Orders=lazy(()=>import('./orders'));
+function Bootstrap({children}){const ready=useShop(s=>s.ready),error=useShop(s=>s.loadError),syncError=useShop(s=>s.syncError);useEffect(()=>{useShop.getState().initialize();const refresh=()=>{if(document.visibilityState==='visible'&&useShop.getState().ready)useShop.getState().refresh();};const timer=setInterval(refresh,30000);window.addEventListener('focus',refresh);return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);};},[]);if(!ready)return error?<main className="page"><h1>Não foi possível carregar a loja.</h1><p role="alert">{error}</p><button className="btn-primary" onClick={()=>useShop.getState().initialize()}>Tentar novamente</button></main>:<Loading/>;return <>{syncError&&<p role="alert" className="auth-note">{syncError}</p>}{children}</>;}
+class ErrorBoundary extends React.Component{state={error:false};static getDerivedStateFromError(){return {error:true}}render(){return this.state.error?<div className="empty-state"><h1>Não foi possível abrir esta tela.</h1><p>Recarregue a página para tentar novamente.</p><button className="btn-primary" onClick={()=>location.reload()}>Tentar novamente</button></div>:this.props.children}}
+function App(){const [splashDone,setSplashDone]=useState(()=>{try{return sessionStorage.getItem('bereree-splash')==='1'}catch{return false}});const finishSplash=()=>{try{sessionStorage.setItem('bereree-splash','1')}catch{}setSplashDone(true)};return <>{!splashDone&&<Splash onDone={finishSplash}/>}<BrowserRouter><ErrorBoundary><FeedbackProvider><InstallProvider><Shell><AgentTools/><Suspense fallback={<Loading/>}><Routes><Route path="/" element={<HomePage/>}/><Route path="/instalar" element={<InstallPage/>}/><Route path="/categorias" element={<CategoriesPage/>}/><Route path="/categoria/:slug" element={<ListingPage/>}/><Route path="/produtos" element={<ListingPage/>}/><Route path="/ofertas" element={<ListingPage offers/>}/><Route path="/favoritos" element={<ListingPage favorites/>}/><Route path="/produto/:slug" element={<ProductPage/>}/><Route path="/cesta" element={<CartPage/>}/><Route path="/checkout/:step" element={<Checkout/>}/><Route path="/boas-vindas" element={<Account screen="welcome"/>}/><Route path="/login" element={<Account screen="login"/>}/><Route path="/cadastro" element={<Account screen="register"/>}/><Route path="/perfil" element={<Account screen="profile"/>}/><Route path="/perfil/enderecos" element={<Account screen="addresses"/>}/><Route path="/perfil/configuracoes" element={<Account screen="settings"/>}/><Route path="/lista-compras" element={<Extras screen="lists"/>}/><Route path="/videos" element={<Extras screen="videos"/>}/><Route path="/admin" element={<Account screen="manage"/>}/><Route path="/gestao" element={<Account screen="manage"/>}/><Route path="/pedidos" element={<Orders/>}/><Route path="/pedido/acompanhamento" element={<Orders tracking/>}/><Route path="*" element={<Empty title="Essa página não existe." action="Voltar ao início"/>}/></Routes></Suspense></Shell></InstallProvider></FeedbackProvider></ErrorBoundary></BrowserRouter></>}
+createRoot(document.getElementById('root')).render(<Bootstrap><App/></Bootstrap>);
+if('serviceWorker' in navigator&&import.meta.env.PROD)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));

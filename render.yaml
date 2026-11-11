@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: bereree
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PUBLIC_ORIGIN
+        sync: false
+      - key: DATABASE_PATH
+        value: /var/data/bereree.sqlite
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: BACKUP_DIR
+        value: /var/data/backups
+      - key: BACKUP_KEY
+        sync: false
+      - key: BACKUP_INTERVAL_HOURS
+        value: 24
+    disk:
+      name: store-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,72 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openDatabase } from './database-fixture.js';
+import { createApp } from '../server/index.js';
+import { createAdmin } from '../server/auth.js';
+import '../js/core.js';
+import {validWhatsapp} from '../server/validation.js';
+
+test('administrative HTML and image inputs are escaped and validated',()=>{
+  const core=globalThis.StoreCore;
+  assert.equal(core.escape(`"'><img onerror="x">&`),'&quot;&#39;&gt;&lt;img onerror=&quot;x&quot;&gt;&amp;');
+  assert.equal(core.image('javascript:alert(1)'), '');
+  assert.equal(validWhatsapp('5500000000000'),false);
+  assert.equal(validWhatsapp('5571999998888'),true);
+});
+test('HTTP API, admin access, snapshots, validation, idempotency and persistence',async(t)=>{
+  const dir=mkdtempSync(join(tmpdir(),'bereree-test-')), path=join(dir,'store.sqlite');
+  let db=openDatabase(path);createAdmin(db,{email:'admin@example.com',password:'StrongPassword-123'});
+  createAdmin(db,{email:'editor@example.com',password:'StrongPassword-123',role:'editor'});
+  const server=createApp({db});server.listen(0,'127.0.0.1');await once(server,'listening');
+  const base=`http://127.0.0.1:${server.address().port}`;
+  t.after(async()=>{await new Promise(r=>server.close(r));db.close();rmSync(dir,{recursive:true,force:true});});
+  let token;
+  async function request(path,method='GET',data,headers={}) {
+    if(path==='/api/quotes'&&method==='POST')data={customer:{name:'Cliente de teste',phone:'71988887777'},...data};
+    const res=await fetch(`${base}${path}`,{method,headers:{...(data?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...headers},body:data?JSON.stringify(data):undefined});
+    const type=res.headers.get('content-type');return {status:res.status,data:type?.includes('json')?await res.json():await res.text()};
+  }
+  assert.equal((await request('/')).status,200);
+  for(const path of ['/.env','/storage/store.sqlite','/server/db.js','/.git/config','/package.json']) assert.equal((await request(path)).status,404);
+  assert.equal((await request('/api/admin/orders')).status,401);
+  assert.equal((await request('/api/quotes','POST',{},{Origin:'https://evil.example'})).status,403);
+  assert.equal((await request('/api/admin/login','POST',{email:'admin@example.com',password:'wrong'})).status,401);
+  const auth=await request('/api/admin/login','POST',{email:'admin@example.com',password:'StrongPassword-123'});assert.equal(auth.status,200);token=auth.data.token;
+  let cat=(await request('/api/catalog')).data;assert.equal(cat.products.length,30);assert.equal(cat.categories.length,5);assert.equal(cat.products[0].offer,false);
+  assert.equal(JSON.stringify(cat).includes('password_hash'),false);
+  const p={...cat.products[0],price:null,oldPrice:null,name:'Fruta " especial <teste>',active:true};
+  assert.equal((await request('/api/admin/products/1','PUT',p)).status,200);
+  p.version++;
+  assert.equal((await request('/api/admin/products/1','PUT',{...p,price:0})).status,400);
+  assert.equal((await request('/api/admin/products/1','PUT',{...p,image:'javascript:alert(1)'})).status,400);
+  for(const qty of [0,-1,1.5,'1',100]) assert.equal((await request('/api/quotes','POST',{requestKey:'invalid-quantity-key',items:[{id:1,qty}]})).status,400);
+  assert.equal((await request('/api/quotes','POST',{requestKey:'unknown-product-key',items:[{id:9999,qty:1}]})).status,409);
+  const input={requestKey:'test-request-key-123456',items:[{id:1,qty:2},{id:2,qty:1}],total:0};
+  const quote=await request('/api/quotes','POST',input);assert.equal(quote.status,201);assert.equal(quote.data.total,null);assert.equal(quote.data.knownSubtotal,8.9);
+  assert.match(quote.data.message,/Sob consulta/);assert.match(quote.data.message,/Referência: BER-0001/);assert.match(quote.data.message,/Características/);assert.match(quote.data.message,/Condição comercial/);
+  const again=await request('/api/quotes','POST',input);assert.equal(again.data.id,quote.data.id);
+  assert.equal((await request('/api/quotes','POST',{...input,items:[{id:1,qty:3}]})).status,409);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,1);
+  await request('/api/admin/products/1','PUT',{...p,name:'Changed',price:500});
+  const saved=(await request(`/api/admin/orders/${quote.data.id}`)).data;
+  assert.equal(saved.items[0].name_snapshot,p.name);assert.equal(saved.items[0].unit_price_cents,null);
+  assert.match(saved.terms_snapshot,/Entrega:/);assert.match(saved.terms_snapshot,/Pagamento:/);
+  assert.equal((await request('/api/quotes','POST',input)).data.message,quote.data.message);
+  const customer=await request('/api/admin/customers','POST',{name:'Cliente',email:'client@example.com',phone:'71999998888'});assert.equal(customer.status,201);
+  assert.equal((await request(`/api/admin/orders/${quote.data.id}`,'PUT',{stage:'in_progress',version:saved.version,customerId:customer.data.id})).status,200);
+  assert.equal((await request('/api/admin/categories','POST',{id:'teste',label:'Teste',active:true})).status,201);
+  assert.equal((await request('/api/admin/categories','POST',{id:'teste',label:'Teste',active:true})).status,409);
+  assert.equal((await request('/api/events','POST',{name:'product_view',productId:9999})).status,400);
+  assert.equal((await request('/api/admin/metrics')).status,200);
+  assert.equal((await request('/api/admin/settings','PUT',{...cat.settings,secret:'do not expose',confirmed:false})).status,200);
+  assert.equal((await request('/api/settings')).data.secret,undefined);
+  const editor=await request('/api/admin/login','POST',{email:'editor@example.com',password:'StrongPassword-123'});const adminToken=token;token=editor.data.token;
+  assert.equal((await request('/api/admin/settings','PUT',cat.settings)).status,403);token=adminToken;
+  assert.equal((await request('/api/admin/logout','POST',{})).status,200);assert.equal((await request('/api/admin/orders')).status,401);
+  // A separate connection proves the data is persisted outside the process state.
+  const reopened=openDatabase(path);assert.equal(reopened.prepare('SELECT COUNT(*) AS n FROM orders').get().n,1);assert.equal(reopened.prepare('SELECT COUNT(*) AS n FROM migrations').get().n,6);reopened.close();
+});

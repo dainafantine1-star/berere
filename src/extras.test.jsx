@@ -1,0 +1,15 @@
+import React from 'react';
+import {it,expect,beforeEach,vi,afterEach} from 'vitest';
+import {render,screen} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {MemoryRouter} from 'react-router-dom';
+import Extras,{orderMessage,OrderWhatsapp} from './extras';
+import {ZoomImage,FeedbackProvider} from './ui';
+import {useShop} from './store';
+const order={id:'order-1',protocol:'BER-TESTE',customer:{nome:'Maria',telefone:'75999998888'},mode:'retirada',payment:'dinheiro',subtotal:5,frete:0,total:5,items:[{id:1,nome:'Banana prata',codigo:'BER-0001',quantidade:.5,preco_unitario:10,unidade:'kg'}]};
+beforeEach(()=>useShop.setState({products:[],productVideos:[],adminSettings:{whatsapp:''},shoppingLists:[],cart:{}}));
+afterEach(()=>vi.unstubAllGlobals());
+it('amplia a imagem e devolve foco ao fechar',async()=>{const u=userEvent.setup();render(<ZoomImage src="/banana.png" alt="Banana prata"/>);const button=screen.getByRole('button',{name:'Ampliar foto de Banana prata'});await u.click(button);expect(screen.getByRole('dialog')).toBeTruthy();await u.keyboard('{Escape}');expect(screen.queryByRole('dialog')).toBeNull();expect(document.activeElement).toBe(button);});
+it('usa o protocolo e preços preservados na mensagem do pedido',()=>{const message=orderMessage(order);expect(message).toContain('Pedido: BER-TESTE');expect(message).toContain('0.5 kg · Banana prata (BER-0001)');expect(message).not.toContain('PEDIDO DE TESTE');});
+it('envia resumo somente para o WhatsApp configurado pela loja',()=>{useShop.setState({adminSettings:{whatsapp:'5575999998888'}});render(<OrderWhatsapp order={order}/>);const url=new URL(screen.getByRole('link',{name:'Abrir resumo no WhatsApp'}).href);expect(url.pathname).toBe('/5575999998888');expect(url.searchParams.get('text')).toBe(orderMessage(order));});
+it('não exibe vídeos de demonstração quando não há cadastro no ADM',()=>{render(<MemoryRouter><Extras screen="videos"/></MemoryRouter>);expect(screen.getByText('Novos vídeos em breve.')).toBeTruthy();expect(document.querySelector('video')).toBeNull();});

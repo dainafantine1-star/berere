@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+!.env.example
+node_modules
+storage
+Microsoft
+screenshot-*.png
+test
+*.log
+*.mpbackup
+.cache
+playwright-report
+test-results
+dist
+e2e

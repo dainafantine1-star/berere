@@ -1,0 +1,23 @@
+{
+  "measuredAt": "2026-10-29T22:49:36.934Z",
+  "results": [
+    {
+      "label": "JavaScript do app gzip",
+      "bytes": 105818,
+      "limit": 160000,
+      "ok": true
+    },
+    {
+      "label": "CSS do app gzip",
+      "bytes": 11322,
+      "limit": 30000,
+      "ok": true
+    },
+    {
+      "label": "JavaScript do ADM gzip",
+      "bytes": 29086,
+      "limit": 65000,
+      "ok": true
+    }
+  ]
+}

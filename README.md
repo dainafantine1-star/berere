@@ -1,116 +1,80 @@
-# Madeireira Progresso — Site
+# Berêrê — app e administração integrados
 
-Site institucional e e-commerce simples para a Madeireira Progresso. Mobile-first, com identidade visual laranja/preto, busca, carrinho e checkout via WhatsApp.
+O app React do Berêrê usa uma API e uma administração compartilhadas. Catálogo, clientes e pedidos ficam em um banco compartilhado. O painel autenticado fica em `/admin`; o app do cliente fica em `/`.
 
-## 🌐 URL pública
+## Executar
 
-Acesse em: **`https://luizrickston.github.io/madeireira-progresso/`** *(atualizar após o primeiro deploy)*
+Na pasta principal deste projeto, com Node.js 24:
 
-## 📁 Estrutura
-
-```
-madeireira-progresso/
-├── index.html        # Página principal (única)
-├── css/style.css     # Estilos (cores, responsividade)
-├── js/
-│   ├── data.js       # Lista de produtos
-│   ├── ui.js         # Componentes (modal, drawer, toast)
-│   └── app.js        # Lógica principal (carrinho, busca, filtros)
-└── README.md         # Este arquivo
+```powershell
+npm.cmd ci
+npm.cmd run build
+npm.cmd start
 ```
 
-## ⚙️ Como editar
+Abra `http://127.0.0.1:3000` para o app e `http://127.0.0.1:3000/admin` para a administração. A compilação já foi gerada no ambiente de desenvolvimento desta entrega.
 
-### 1. Trocar o número de WhatsApp (PRIORITÁRIO)
+Para criar o primeiro proprietário, em outro terminal interativo:
 
-Abra `js/app.js` e edite a primeira linha dentro do `App`:
-
-```js
-const WHATSAPP_NUMBER = '5500000000000'; // TROCAR PARA O NÚMERO REAL
+```powershell
+npm.cmd run owner:create
 ```
 
-Formato: `55` (Brasil) + DDD (2 dígitos) + número (9 dígitos). Sem espaços, sem `+`.
+O comando solicita e-mail e senha oculta. Não existe senha padrão nem cadastro público de administrador. As contas dos testes são criadas exclusivamente em bancos isolados e não dão acesso à loja.
 
-Exemplo: um número `(64) 99999-8888` vira `5564999998888`.
+O banco padrão é `storage/bereree.sqlite`. Mídias ficam em `storage/uploads`. O catálogo inicial contém os 30 produtos demonstrativos do app, com preços, descrições e imagens ainda sujeitos à revisão da empresa.
 
-### 2. Adicionar / editar / remover produtos
+Novos pedidos começam **pausados**. No ADM, revise Produtos, Dados da empresa e Opções do app antes de ativar **Receber novos pedidos**. Entrega começa desativada; retirada está disponível para configuração. A ativação é persistida no banco.
 
-Abra `js/data.js`. Cada produto segue este formato:
+## O que está integrado
 
-```js
-{
-    id: 1,
-    name: "Porta de Madeira Maciça",
-    category: "portas",          // usado para filtro
-    categoryLabel: "Portas",     // texto exibido
-    price: 890,
-    oldPrice: 1050,              // null se não tiver oferta
-    offer: true,                 // mostra badge "OFERTA"
-    description: "Texto curto...",
-    specs: {                     // tabela no modal
-        "Material": "Angelim",
-        "Medida": "80x210cm"
-    },
-    image: "URL da foto"         // JPG/PNG/WebP
-}
+- Catálogo, categorias, imagens, preços, promoções, destaques e disponibilidade controlados pelo ADM.
+- Cadastro de clientes com senha e sessão HttpOnly; dados da conta disponíveis em outro dispositivo após login.
+- Sessão de visitante, com pedido e histórico privados no navegador que possui o cookie. Ao entrar/criar conta, os dados dessa sessão visitante são associados à conta.
+- Cesta, checkout, retirada/entrega, contato, observações, protocolo e snapshots de preço, código e foto.
+- Cálculo de itens e frete no servidor; preço/estoque do navegador não são fonte de autoridade.
+- Quantidades fracionadas para kg/g. Pacotes, bandejas e maços usam contagem inteira; a embalagem é informada no cadastro.
+- Baixa de estoque transacional ao receber pedido; devolução ao cancelar; reenvio idempotente sem duplicação.
+- Separação, pronto para retirada/saída para entrega, conclusão e cancelamento pelo ADM. O cliente apenas acompanha.
+- Opções do app: pausa de pedidos, modalidades, taxa única de entrega, pedido mínimo, formas de pagamento, vídeos e popup de ofertas.
+- Campanhas e popup usam conteúdo do servidor; preços do popup vêm dos produtos em promoção.
+- Favoritos, listas de compras e endereços privados persistidos no servidor. Apenas cesta, indicação de boas-vindas e chave de tentativa são mantidas no armazenamento local do app.
+- WhatsApp com resumo do pedido já registrado, sem envio automático de mensagens.
+- Equipe, permissões, auditoria, importação/exportação CSV, imagens otimizadas, métricas, backup e restauração reaproveitados.
+- PWA e instalação no celular preservados. O service worker não armazena respostas da API nem páginas administrativas.
+
+O app consulta dados novamente a cada 30 segundos quando visível e ao recuperar o foco. O pedido sempre é revalidado no servidor.
+
+Os antigos orçamentos manuais continuam disponíveis como atendimento separado. Eles mantêm seu fluxo de negociação e não baixam estoque; os pedidos criados pelo novo checkout têm fluxo próprio de estoque e entrega.
+
+## Pagamentos e ampliações
+
+Selecionar dinheiro, cartão ou PIX registra a forma combinada. Não há processamento online nem confirmação automática de pagamento. O mapa de endereços não representa GPS do entregador.
+
+Continuam como ampliações: cobrança online e conciliação, frete por bairro, agendamento, ajuste por peso efetivo após separação, substituições, cupons, combos com composição de estoque, validade/perdas, notificações push, recuperação/verificação de e-mail e gestão financeira. O peso escolhido no checkout é a quantidade usada para preço e estoque nesta versão.
+
+As imagens herdadas do app incluem materiais identificados como demonstrativos em `public/image-sources.json`. Use fotos próprias ou licenciadas antes da operação comercial. O catálogo inicial tem uma única fonte em `database/catalog.json`; as alterações da operação são feitas pelo ADM.
+
+## Desenvolvimento e testes
+
+```powershell
+npm.cmd test
+npm.cmd run build
+npm.cmd run check:app
+npm.cmd run test:browsers
+npm.cmd run check:performance
 ```
 
-Categorias disponíveis: `portas`, `cancelas`, `ripas`, `tabuas`, `decks`, `forros`, `estrutural`.
+Os testes não usam o banco da loja. A suíte de servidor inclui a integração nova e os testes dos módulos de gestão, com dados de produtos de mercado em uma fixture isolada. A suíte de navegador usa Chromium desktop e celular Android emulado. Instalação de navegadores, se necessária: `npm.cmd run browsers:install`.
 
-### 3. Trocar as fotos dos produtos
+Para editar com Vite: mantenha `npm.cmd start` na porta 3000 e execute `npm.cmd run dev` em outro terminal. A API é encaminhada pelo proxy de desenvolvimento. Para avaliar a versão final, prefira a origem única na porta 3000 após compilar.
 
-As fotos atuais vêm do Unsplash via URL. Para usar fotos reais do cliente:
+## Hospedagem
 
-1. Coloque as imagens em uma pasta `images/` (crie se precisar)
-2. Troque a URL em `data.js` por `images/nome-do-arquivo.jpg`
-3. As imagens serão commitadas junto com o site
+Esta integração precisa de Node.js 24, banco SQLite e uploads em disco persistente, em uma única instância. O Dockerfile compila o React e executa o backend; `render.yaml` prepara essa alternativa de hospedagem. Os modelos não criam nem contratam serviços automaticamente.
 
-Tamanho recomendado: **800x600px**, JPEG ou WebP, máximo 200KB cada.
+A publicação estática antiga na Vercel não executa esta API. Para manter esse provedor com arquitetura diferente, é necessário preparar o backend e armazenamento compatíveis antes da publicação. Não foi feita publicação nem alteração do repositório remoto nesta entrega.
 
-### 4. Editar os banners do carrossel (hero)
+Copie `.env.example` para `.env` quando precisar personalizar a configuração. Em produção, configure `PUBLIC_ORIGIN` com HTTPS, o armazenamento persistente, a chave de backup e o destino externo. Não use OneDrive para o banco de produção. Backups incluem banco e mídia; restauração revoga sessões de clientes e equipe. O arquivo restaurado se chama `store.sqlite`; aponte `DATABASE_PATH` para ele.
 
-Abra `index.html` e procure por `<!-- ===== HERO CARROSSEL ===== -->`. Cada `article.hero__slide` é um banner. Edite o `tag`, `title` e `text` de cada um.
-
-### 5. Mudar cores
-
-Abra `css/style.css` e procure por `:root` no topo. As variáveis são:
-
-```css
---orange: #FF6B1A;        /* cor principal */
---orange-light: #FF8A3D;  /* hover */
---orange-soft: #FFB347;   /* tons suaves */
---black: #0A0A0A;         /* fundo principal */
---ink: #1a1410;           /* fundo secundário */
-```
-
-## 🚀 Como atualizar o site no ar
-
-Toda vez que você editar algo:
-
-```bash
-cd madeireira-progresso
-git add .
-git commit -m "Mudei o produto X"
-git push
-```
-
-O GitHub Pages atualiza em 30-60 segundos automaticamente.
-
-## 🛒 Como funciona o carrinho
-
-- O cliente adiciona produtos, ajusta quantidade
-- Ao clicar em **"Finalizar pelo WhatsApp"**, abre uma conversa pré-preenchida com a lista de itens e o total
-- **Não há pagamento no site** — o fechamento do pedido é todo pelo WhatsApp
-- O carrinho fica salvo no navegador (localStorage), então sobrevive a um F5
-
-## 💡 Próximos passos (futuro)
-
-- Integrar gateway de pagamento (Mercado Pago, PagSeguro)
-- Painel admin para editar produtos sem mexer em código
-- Sistema de login para clientes
-- Controle de estoque
-- Cupons de desconto
-
----
-
-**Feito com 🪵 pela Chapada Digital**
+Verificações realizadas e limites de homologação: [VALIDACAO.md](VALIDACAO.md).

@@ -1,0 +1,44 @@
+services:
+  app:
+    build: .
+    image: bereree:${RELEASE_TAG:-local}
+    restart: unless-stopped
+    init: true
+    environment:
+      PUBLIC_ORIGIN: https://${SITE_DOMAIN:?Configure SITE_DOMAIN}
+      BACKUP_KEY: ${BACKUP_KEY:?Configure BACKUP_KEY}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_MIRROR_DIR: /backup-mirror
+      TRUST_PROXY_IP: 172.29.253.2
+    volumes:
+      - store_data:/var/data
+      - ${BACKUP_MIRROR_PATH:?Configure um destino externo de backup}:/backup-mirror
+    networks:
+      internal:
+        ipv4_address: 172.29.253.3
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  proxy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Configure SITE_DOMAIN}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      internal:
+        ipv4_address: 172.29.253.2
+    depends_on: [app]
+volumes:
+  store_data:
+  caddy_data:
+  caddy_config:
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.29.253.0/24
